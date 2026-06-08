@@ -16,59 +16,33 @@ export default {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
-      // Use /models/{owner}/{name}/predictions — no version hash needed, always latest
-      const startRes = await fetch(
-        'https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions',
+      const hfRes = await fetch(
+        'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell',
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${env.REPLICATE_API_TOKEN}`,
+            'Authorization': `Bearer ${env.HF_TOKEN}`,
             'Content-Type': 'application/json',
-            'Prefer': 'wait',
+            'x-use-cache': 'false',
           },
-          body: JSON.stringify({
-            input: {
-              prompt: prompt,
-              num_outputs: 1,
-              output_format: 'png',
-              output_quality: 90,
-              disable_safety_checker: true,
-            },
-          }),
+          body: JSON.stringify({ inputs: prompt }),
         }
       );
 
-      if (!startRes.ok) {
-        const err = await startRes.text();
+      if (!hfRes.ok) {
+        const err = await hfRes.text();
         return new Response(
-          JSON.stringify({ error: `Replicate error: ${err}` }),
+          JSON.stringify({ error: `HF error: ${err}` }),
           { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      const prediction = await startRes.json();
-      let outputUrl = prediction?.output?.[0];
-
-      // Poll if Prefer:wait didn't resolve synchronously
-      if (!outputUrl && prediction?.urls?.get) {
-        for (let i = 0; i < 30; i++) {
-          await new Promise(r => setTimeout(r, 2000));
-          const poll = await fetch(prediction.urls.get, {
-            headers: { 'Authorization': `Bearer ${env.REPLICATE_API_TOKEN}` },
-          });
-          const result = await poll.json();
-          if (result.status === 'succeeded') { outputUrl = result.output?.[0]; break; }
-          if (result.status === 'failed') throw new Error(result.error || 'Generation failed');
-        }
-      }
-
-      if (!outputUrl) throw new Error('Timed out waiting for image');
-
-      const imgRes = await fetch(outputUrl);
-      const imgBuffer = await imgRes.arrayBuffer();
+      // HF returns raw image binary directly
+      const imgBuffer = await hfRes.arrayBuffer();
+      const contentType = hfRes.headers.get('content-type') ?? 'image/jpeg';
 
       return new Response(imgBuffer, {
-        headers: { ...corsHeaders, 'Content-Type': 'image/png' },
+        headers: { ...corsHeaders, 'Content-Type': contentType },
       });
 
     } catch (err) {
