@@ -24,4 +24,4 @@ Returns raw PNG binary.
 ## Model
 
 `black-forest-labs/flux-schnell` via Replicate unified predictions API.
-`disable_safety_checker: true` — explicit content enabled.
+`disable_safety_checker: true` — explicit content enabled!
