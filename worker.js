@@ -16,24 +16,27 @@ export default {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
-      const startRes = await fetch('https://api.replicate.com/v1/predictions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${env.REPLICATE_API_TOKEN}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'wait',
-        },
-        body: JSON.stringify({
-          version: '5f24084160c9089501c1b3545d9be3c27883ae2c',
-          input: {
-            prompt: prompt,
-            num_outputs: 1,
-            output_format: 'png',
-            output_quality: 90,
-            disable_safety_checker: true,
+      // Use /models/{owner}/{name}/predictions — no version hash needed, always latest
+      const startRes = await fetch(
+        'https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${env.REPLICATE_API_TOKEN}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'wait',
           },
-        }),
-      });
+          body: JSON.stringify({
+            input: {
+              prompt: prompt,
+              num_outputs: 1,
+              output_format: 'png',
+              output_quality: 90,
+              disable_safety_checker: true,
+            },
+          }),
+        }
+      );
 
       if (!startRes.ok) {
         const err = await startRes.text();
@@ -46,6 +49,7 @@ export default {
       const prediction = await startRes.json();
       let outputUrl = prediction?.output?.[0];
 
+      // Poll if Prefer:wait didn't resolve synchronously
       if (!outputUrl && prediction?.urls?.get) {
         for (let i = 0; i < 30; i++) {
           await new Promise(r => setTimeout(r, 2000));
