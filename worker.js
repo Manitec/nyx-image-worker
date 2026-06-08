@@ -16,14 +16,14 @@ export default {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
+      // HF Serverless Inference router endpoint (bypasses api-inference subdomain)
       const hfRes = await fetch(
-        'https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell',
+        'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell',
         {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${env.HF_TOKEN}`,
             'Content-Type': 'application/json',
-            'x-use-cache': 'false',
           },
           body: JSON.stringify({ inputs: prompt }),
         }
@@ -37,7 +37,6 @@ export default {
         );
       }
 
-      // HF returns raw image binary directly
       const imgBuffer = await hfRes.arrayBuffer();
       const contentType = hfRes.headers.get('content-type') ?? 'image/jpeg';
 
