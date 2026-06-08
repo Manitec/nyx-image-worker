@@ -16,7 +16,6 @@ export default {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
-      // POST to Replicate — FLUX.1 schnell
       const startRes = await fetch('https://api.replicate.com/v1/predictions', {
         method: 'POST',
         headers: {
@@ -25,7 +24,7 @@ export default {
           'Prefer': 'wait',
         },
         body: JSON.stringify({
-          model: 'black-forest-labs/flux-schnell',
+          version: '5f24084160c9089501c1b3545d9be3c27883ae2c',
           input: {
             prompt: prompt,
             num_outputs: 1,
@@ -47,7 +46,6 @@ export default {
       const prediction = await startRes.json();
       let outputUrl = prediction?.output?.[0];
 
-      // Poll if Prefer:wait didn't resolve synchronously
       if (!outputUrl && prediction?.urls?.get) {
         for (let i = 0; i < 30; i++) {
           await new Promise(r => setTimeout(r, 2000));
@@ -62,7 +60,6 @@ export default {
 
       if (!outputUrl) throw new Error('Timed out waiting for image');
 
-      // Fetch and return image binary — same contract as original CF Worker
       const imgRes = await fetch(outputUrl);
       const imgBuffer = await imgRes.arrayBuffer();
 
