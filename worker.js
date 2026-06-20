@@ -1,3 +1,17 @@
+const HF_URL = 'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell';
+
+async function fetchImage(prompt, token) {
+  const res = await fetch(HF_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ inputs: prompt }),
+  });
+  return res;
+}
+
 export default {
   async fetch(request, env) {
     const corsHeaders = {
@@ -16,23 +30,18 @@ export default {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
 
-      // HF Serverless Inference router endpoint (bypasses api-inference subdomain)
-      const hfRes = await fetch(
-        'https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${env.HF_TOKEN}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ inputs: prompt }),
-        }
-      );
+      let hfRes = await fetchImage(prompt, env.HF_TOKEN);
+
+      // Retry once on 503 (model busy / at capacity)
+      if (hfRes.status === 503 || hfRes.status === 429) {
+        await new Promise(r => setTimeout(r, 3000));
+        hfRes = await fetchImage(prompt, env.HF_TOKEN);
+      }
 
       if (!hfRes.ok) {
         const err = await hfRes.text();
         return new Response(
-          JSON.stringify({ error: `HF error: ${err}` }),
+          JSON.stringify({ error: `HF ${hfRes.status}: ${err}` }),
           { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
